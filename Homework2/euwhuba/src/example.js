@@ -14,7 +14,7 @@ async function loadSpotifyCSV()
         // This callback allows you to rename the keys, format values, and drop columns you don't need
         return { track_id: d.track_id, track_name: d.track_name, track_popularity: +d.track_popularity, album_type: d.album_type,
             artist_name: d.artist_name, explicit: d.explicit, artist_popularity: +d.artist_popularity, 
-            track_duration_ms: +d.track_duration_ms, artist_followers: +d.artist_followers}
+            track_duration_min: +d.track_duration_ms / 60000, artist_followers: +d.artist_followers}
         })
         histo = dataFromCSV.slice()
         pie = Array.from(d3.rollup(dataFromCSV, v => v.length,d => d.album_type),
@@ -275,7 +275,7 @@ function initChart()
     
     const paraData = histo.slice(0,400)
 
-    const paraDimension = ['track_popularity','artist_popularity','artist_followers', 'track_duration_ms']
+    const paraDimension = [ 'track_popularity', 'artist_popularity', 'track_duration_min', 'artist_followers' ]
     
     const xScale = d3.scalePoint()
     .domain(paraDimension)
@@ -304,6 +304,8 @@ function initChart()
      .attr('stroke', 'steelblue')
      .attr('stroke-width', 1)
      .attr('opacity', 0.25)
+     .attr('stroke', d => popularityColor(d))
+
     
     const barAxis = g.selectAll('.axis')
      .data(paraDimension)
@@ -322,6 +324,8 @@ function initChart()
      .style('font-size', '.8rem')
      .text(d => d.replace('_', ' '))
 
+
+     
     const barParaTitle = svg.append('text')
      .attr('x', size.width / 2)
      .attr('y', margin.top / 2)
@@ -329,6 +333,51 @@ function initChart()
      .style('font-size', '1rem')
      .style('font-weight', 'bold')
      .text('Parallel Coordinates: Track/Artist Popularity Association with Followers & Duration ')
+   
+    function popularityColor(d) 
+    {
+        if (d.track_popularity >= 70) return 'crimson'
+        if (d.track_popularity >= 40) return 'green'
+        return 'steelblue'
+     }
+    const legend = svg.append('g')
+     .attr('transform', `translate(${size.width - margin.right - 160}, ${margin.top})`)
+     
+    legend.append('line')
+     .attr('x1', 0).attr('x2', 20)
+     .attr('y1', 8).attr('y2', 8)
+     .attr('stroke', 'crimson').attr('stroke-width', 2)
+
+    legend.append('text')
+     .attr('x', 26).attr('y', 12)
+     .style('font-size', '.8rem')
+     .text('High popularity')
+
+    legend.append('line')
+     .attr('x1', 0).attr('x2', 20)
+     .attr('y1', 28).attr('y2', 28)
+     .attr('stroke', 'green').attr('stroke-width', 2)
+
+    legend.append('text')
+     .attr('x', 26).attr('y', 32)
+     .style('font-size', '.8rem')
+     .text('Medium popularity')
+
+    legend.append('line')
+     .attr('x1', 0).attr('x2', 20)
+     .attr('y1', 48).attr('y2', 48)
+     .attr('stroke', 'steelblue').attr('stroke-width', 2)
+
+    legend.append('text')
+     .attr('x', 26).attr('y', 52)
+     .style('font-size', '.8rem')
+     .text('Low popularity')
+
+    
+    
+
+    
+
     
 
 
