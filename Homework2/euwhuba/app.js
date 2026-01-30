@@ -7,9 +7,12 @@ import './style.css'
 
 document.querySelector('#app').innerHTML = `
   <div id='main-container' class='d-flex flex-column flex-nowrap'>
+  <div id="vis-wrapper">
     ${BarChart()}
-    ${Notes("This is a message sent from app.js")}
   </div>
+  ${Notes("")}
+</div>
+
 `
 
 mountBarChart();

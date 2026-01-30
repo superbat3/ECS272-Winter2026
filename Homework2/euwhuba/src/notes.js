@@ -7,7 +7,8 @@ export const Notes = (msg) => (`
         <div class="card-content">
             <h5>${msg}</h5>
             <p>
-                This template uses Materialize, a UI libarary based on Google's Material Design. It is independent of any frontend frameworks (e.g., Vuetify for Vue, Materail UI for React), hence good for vanilla JavaScript projects. 
+                The median value of track popularity is 58, open console log to verify. Also, the parallel coordinates
+                chart only covers the first 400 points of the spotify dataset.
             </p>
         </div>
         <div class="card-action">
