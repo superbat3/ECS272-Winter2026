@@ -300,12 +300,31 @@ function initChart(svg, offsetY, height)
      .data(paraData)
      .join(
         enter => enter.append('path')
-         .attr('d', path)
-         .attr('fill', 'none')
-         .attr('stroke', popularityColor)
-         .attr('opacity', 0)
-         .transition().duration(400)
-         .attr('opacity', 0.3),
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', popularityColor)
+        .attr('opacity', 0.3)
+        .on('mouseover', function(event, d) {
+            tooltip
+            .style('opacity', 1)
+            .html(`
+                <strong>${d.track_name}</strong><br/>
+                Popularity: ${d.track_popularity}<br/>
+                Artist Popularity: ${d.artist_popularity}
+            `)
+        })
+        .on('mousemove', function(event) {
+            tooltip
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 20) + 'px')
+        })
+        .on('mouseout', function() {
+            tooltip.style('opacity', 0)
+        })
+        .attr('opacity', 0)
+        .transition()
+        .duration(400)
+        .attr('opacity', 0.3),
         update => update.transition().duration(400).attr('d', path),
         exit => exit.transition().duration(300).attr('opacity', 0).remove()
      )
@@ -345,6 +364,18 @@ function initChart(svg, offsetY, height)
         if (d.track_popularity >= 40) return 'green'
         return 'steelblue'
      }
+    const tooltip = d3.select('body')
+    .append('div')
+    .attr('class', 'tooltip')
+    .style('position', 'absolute')
+    .style('background', 'white')
+    .style('padding', '6px 10px')
+    .style('border', '1px solid #782323')
+    .style('border-radius', '4px')
+    .style('font-size', '.75rem')
+    .style('pointer-events', 'none')
+    .style('opacity', 0)
+
     const legend = g.append('g')
     .attr('transform', `translate(${paraWidth - 120}, 10)`)
 
