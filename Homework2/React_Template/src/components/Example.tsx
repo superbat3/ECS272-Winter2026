@@ -23,24 +23,46 @@ export default function Example() {
   useResizeObserver({ ref: barRef as React.RefObject<HTMLDivElement>, onResize });
   
   useEffect(() => {
-    // For reading json file
-    /*if (isEmpty(dataFromJson)) return;
-    setBars(dataFromJson.data);*/
-    
-    // For reading csv file
-    const dataFromCSV = async () => {
-      try {
-        const csvData = await d3.csv('../../data/demo.csv', d => {
-          // This callback allows you to rename the keys, format values, and drop columns you don't need
-          return {category: d.category, value: +d.value};
-        });
-        setBars(csvData);
-      } catch (error) {
-        console.error('Error loading CSV:', error);
-      }
-    } 
-    dataFromCSV();
-  }, [])
+  const dataFromCSV = async () => {
+    try {
+      const [spotify, tracks] = await Promise.all([
+        d3.csv('../../data/spotify_data_clean.csv', d => {
+          return {
+            track_id: d.track_id,
+            artist: d.artist_name,
+            track_name: d.track_name,
+            popularity: +d.popularity,
+            danceability: +d.danceability,
+            energy: +d.energy,
+            valence: +d.valence,
+            tempo: +d.tempo
+          };
+        }),
+        d3.csv('../../data/track_data_final.csv', d => {
+          return {
+            track_id: d.track_id,
+            duration_ms: +d.duration_ms,
+            explicit: d.explicit === "1",
+            release_year: +d.release_year
+          };
+        })
+      ]);
+
+      const bars = spotify.map(d => ({
+        category: d.track_name,
+        value: d.popularity
+      }));
+
+      setBars(bars.slice(0, 20));
+      console.log("spotify:", spotify);
+      console.log("tracks:", tracks);
+    } catch (error) {
+      console.error('Error loading CSV:', error);
+    }
+  };
+
+  dataFromCSV();
+}, []);
 
   useEffect(() => {
     if (isEmpty(bars)) return;
