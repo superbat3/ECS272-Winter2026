@@ -7,12 +7,13 @@ export const Notes = (msg) => (`
         <div class="card-content">
             <h5>${msg}</h5>
             <p>
-                The median value of track popularity is 58, open console log to verify. Also, the parallel coordinates
+                The median value of track popularity is 58. The histogram has a brush function 
+                that filters the piechart values for album type and parallel coordinate graph according
+                 to the popularityt amount specified by the brush. First open the Album Type
+                view to see the orignal pie chart. Also, the parallel coordinates
                 chart only covers the first 400 points of the spotify dataset.
+                Transitions enabled on histogram/parallel coordinates.
             </p>
-        </div>
-        <div class="card-action">
-            <a class="waves-effect waves-light btn-small" id='counter-button'>Have clicked this ${counter} times</a>
         </div>
     </div>
 `)

@@ -6,7 +6,8 @@ import { isEmpty, debounce } from 'lodash';
 const margin = { left: 50, right: 20, top: 60, bottom: 80 }
 let size = { width: 0, height: 0 }
 let histo = []
-let pie = []
+//let pie = []
+let activeFilter = []
 let resizeCheck = false
 async function loadSpotifyCSV()
 {// Read in csv files
@@ -17,10 +18,7 @@ async function loadSpotifyCSV()
             track_duration_min: +d.track_duration_ms / 60000, artist_followers: +d.artist_followers}
         })
         histo = dataFromCSV.slice()
-        pie = Array.from(d3.rollup(dataFromCSV, v => v.length,d => d.album_type),
-         ([key, value]) => ({ label: key, value })
-        )
-
+        activeFilter = histo
         resizeCheck = true
 }
 loadSpotifyCSV()
@@ -31,10 +29,7 @@ const onResize = (targets) => {
         if (target.target.getAttribute('id') !== 'bar-container') return
         size = { width: target.contentRect.width, height: target.contentRect.height }
         if (!resizeCheck || size.width === 0 || size.height === 0) return
-        d3.select('#bar-svg').selectAll('*').remove()
-
-        const view = document.querySelector('#view-select')?.value || 'histogram'
-        window.__switchView(view)
+        spotyDash()
 
     })
 }
@@ -42,51 +37,34 @@ const chartObserver = new ResizeObserver(debounce(onResize, 100))
 //next is to complete
 export const BarChart = () => (
   `<div class='chart-container d-flex flex-column' id='bar-container'>
-    
-    <label for="view-select" style="margin-bottom:8px;">
-      Select View:
-    </label>
-    <select id="view-select" onchange="window.__switchView(this.value)">
-      <option value="histogram">Track Popularity Distribution</option>
-      <option value="parallel">Parallel Track Comparison</option>
-      <option value="pie">Album Type Distribution</option>
-    </select>
-
     <svg id='bar-svg' width='100%' height='100%'></svg>
   </div>`
 )
-
 
 export function mountBarChart() { // registering this element to watch its size change
     let barContainer = document.querySelector('#bar-container')
     chartObserver.observe(barContainer)
 
 }
-window.__switchView = function(view) {
-  const svg = d3.select('#bar-svg')
-  svg.selectAll('*').remove()
+function spotyDash()
+{
+    let barContainer = d3.select('#bar-svg')
+    barContainer.selectAll('*').remove()
 
-  if (view === 'histogram') {
-    spotyHistory()
-  } 
-  else if(view =='pie')
-  {
-    spotyPie()
-  }
-  else if (view ==='parallel') {
-    initChart()
-  }
+    const barHeight = size.height * 0.55
+    const viewHeight = size.height * 0.45
+
+    spotyHistory(barContainer, barHeight)
+    initChart(barContainer, barHeight, viewHeight)
+    spotyPie(barContainer, barHeight, viewHeight)
+
 }
 
-function spotyHistory()
+function spotyHistory(chartContainer, height)
 {
-    let chartContainer = d3.select('#bar-svg')
-    chartContainer.selectAll('*').remove()
-
    
     let values = histo.map(d => d.track_popularity)
     const median = d3.median(values)
-    console.log('median:', median)
 
 
     let xExtents = d3.extent(values)
@@ -97,15 +75,15 @@ function spotyHistory()
 
     const histoBin = d3.bin()
     .domain(xScale.domain())
-    .thresholds(10)(values)
+    .thresholds(15)(values)
 
     let yScale = d3.scaleLinear()
     .domain([0, d3.max(histoBin, d => d.length)])
     .nice()
-    .range([size.height - margin.bottom, margin.top])
+    .range([height - margin.bottom, margin.top])
 
     const xAxis = chartContainer.append('g')
-        .attr('transform', `translate(0, ${size.height - margin.bottom})`)
+        .attr('transform', `translate(0, ${height - margin.bottom})`)
         .call(d3.axisBottom(xScale))
         
     const yAxis = chartContainer.append('g')
@@ -114,7 +92,7 @@ function spotyHistory()
 
     const xLabel = chartContainer.append('text')
     .attr('x', size.width / 2)
-    .attr('y', size.height - margin.bottom / 2)
+    .attr('y', height - margin.bottom / 2)
     .style('text-anchor', 'middle')
     .attr('dominant-baseline', 'middle')
     .style('font-size', '.8rem')
@@ -122,7 +100,7 @@ function spotyHistory()
 
 
     const yLabel = chartContainer.append('g')
-    .attr('transform', `translate(12, ${size.height / 2}) rotate(-90)`)
+    .attr('transform', `translate(12, ${height / 2}) rotate(-90)`)
     .append('text')
     .text('Number of Tracks')
     .style('font-size', '.8rem')
@@ -142,20 +120,39 @@ function spotyHistory()
         .data(histoBin)
         .join('rect')
         .attr('x', d => xScale(d.x0) + 1)
-        .attr('y', d => yScale(d.length))
+        .attr('y', yScale(0))
         .attr('width', d => Math.max(0, xScale(d.x1) - xScale(d.x0) - 1))
-        .attr('height', d => yScale(0) - yScale(d.length))
+        .attr('height', 0)
         .attr('fill', 'teal')
+        .transition()
+        .duration(600)
+        .attr('y', d => yScale(d.length))
+        .attr('height', d => yScale(0) - yScale(d.length))
+
     
     const histoMedian = chartContainer.append('line')
         .attr('x1', xScale(median))
         .attr('x2', xScale(median))
-        .attr('y1', yScale(0) - 2)
+        .attr('y1', yScale(0)) // -2
         .attr('y2', yScale(d3.max(histoBin, d => d.length)))
         .attr('stroke', 'crimson')
-        .attr('stroke-width', 2)
+       // .attr('stroke-width', 2)
         .attr('stroke-dasharray', '4,4')
         .raise()
+
+    const brush = d3.brushX()
+     .extent([[margin.left, margin.top], [size.width - margin.right, height - margin.bottom]])
+     .on('end', ({ selection }) => {
+        if (!selection) {
+           activeFilter = histo
+        } 
+        else {
+            const [x0, x1] = selection.map(xScale.invert)
+            activeFilter = histo.filter(d => d.track_popularity >= x0 && d.track_popularity <= x1)
+        }
+        spotyDash()  
+    })
+    const brushed = chartContainer.append('g').call(brush)
    
     const legend = chartContainer.append('g')
     .attr('transform', `translate(${size.width - margin.right - 160}, ${margin.top})`)
@@ -179,7 +176,7 @@ function spotyHistory()
     .attr('y1', 30)
     .attr('y2', 30)
     .attr('stroke', 'crimson')
-    .attr('stroke-width', 2)
+   // .attr('stroke-width', 2)
     .attr('stroke-dasharray', '4,4')
 
     legend.append('text')
@@ -187,67 +184,71 @@ function spotyHistory()
     .attr('y', 34)
     .style('font-size', '.75rem')
     .text('Median popularity')
-
-    
 }
-function spotyPie()
-{
-    let chartContainer = d3.select('#bar-svg')
-    chartContainer.selectAll('*').remove()
-    console.log('pie data:', pie)
 
+function spotyPie(chartContainer, offsetY, height)
+{
+    const spotyFilter = activeFilter.length ? activeFilter : histo
+    
+    const spotyPieFilter = Array.from(
+        d3.rollup(spotyFilter, v => v.length, d => d.album_type),
+        ([label, value]) => ({ label, value })
+    )
+    
 
     const pieColor = d3.scaleOrdinal()
-    .domain(pie.map(d => d.label))
+    .domain(spotyPieFilter.map(d => d.label))
     .range(d3.schemeSet2)
     
-    const radius = Math.min(size.width, size.height) / 2 - 40
+    const total = d3.sum(spotyPieFilter, d => d.value)
+    const radius = Math.min(size.width * 0.35, height) / 2 - 40
     
     const g = chartContainer.append('g')
-    .attr('transform', `translate(${size.width / 2}, ${size.height / 2})`)
+    .attr('transform', `translate(${size.width * 0.82}, ${offsetY + height / 2})`)
 
-    const spotyPieChart = d3.pie()
-    .value(d => d.value)
+    const spotyPieChart = d3.pie().value(d => d.value)
 
     const arc = d3.arc()
     .innerRadius(0)
     .outerRadius(radius)
 
-    console.log('pie data:', pie)
+    //console.log('pie data:', spotyPieFilter)
 
     
     const pieEls = g.selectAll('path')
-    .data(spotyPieChart(pie))
+    .data(spotyPieChart(spotyPieFilter))
     .join('path')
-    .attr('d', arc)
-    .attr('fill', d => pieColor(d.data.label))
-    .attr('stroke', 'white')
-    .style('stroke-width', '2px')
+    .attr('fill', (d, i) => d3.schemeCategory10[i % 10])
+    .attr('d', d => arc({ ...d, startAngle: 0, endAngle: 0 }))
+    .transition()
+    .duration(700)
+    .attrTween('d', function(d) {
+        const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d)
+        return t => arc(i(t))
+    })
 
     const pieLabels = g.selectAll('text')
-    .data(spotyPieChart(pie))
+    .data(spotyPieChart(spotyPieFilter))
     .join('text')
     .attr('transform', d => `translate(${arc.centroid(d)})`)
     .attr('text-anchor', 'middle')
     .style('font-size', '.7rem')
-    .text(d => d.data.label)
+     .text(d => total === 0 ? '' : `${((d.data.value / total) * 100).toFixed(1)}%`)
 
     const spotyAlbum = chartContainer.append('text')
-    .attr('x', size.width / 2)
-    .attr('y', margin.top / 2)
+    .attr('x', size.width * 0.82)
+    .attr('y', offsetY + margin.top / 2)
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'middle')
     .style('font-size', '1rem')
     .style('font-weight', 'bold')
-    .text('Album Type Distribution')
+    .text('Album Type Distribution Filtered')
 
     const legend = chartContainer.append('g')
-    .attr('transform', `translate(${margin.left}, ${margin.top + 20})`)
-
-    let total = d3.sum(pie, d => d.value)
+    .attr('transform', `translate(${size.width * 0.82 + radius + 30}, ${offsetY + height / 2 - radius})`)
 
     const legendItem = legend.selectAll('g')
-    .data(pie)
+    .data(spotyPieFilter)
     .enter()
     .append('g')
     .attr('transform', (d, i) => `translate(0, ${i * 20})`)
@@ -263,17 +264,16 @@ function spotyPie()
     .style('font-size', '.75rem')
     .text(d => `${d.label} (${((d.value / total) * 100).toFixed(1)}%)`)
 }
-function initChart() 
-{
-   const svg = d3.select('#bar-svg')
-   svg.selectAll('*').remove()
 
-    const paraWidth  = size.width - margin.left - margin.right
-    const paraHeight = size.height - margin.top - margin.bottom
+function initChart(svg, offsetY, height) 
+{
+    const paraData = activeFilter.length ? activeFilter : histo
+
+    const paraWidth  =  size.width * 0.65 - margin.left
+    const paraHeight = height - margin.top - margin.bottom
     const g = svg.append('g')
-    .attr('transform', `translate(${margin.left}, ${margin.top})`)
+    .attr('transform', `translate(${margin.left}, ${offsetY + margin.top})`)
     
-    const paraData = histo.slice(0,400)
 
     const paraDimension = [ 'track_popularity', 'artist_popularity', 'track_duration_min', 'artist_followers' ]
     
@@ -285,7 +285,7 @@ function initChart()
     const yScale = {}
     paraDimension.forEach(dim => {
         yScale[dim] = d3.scaleLinear()
-        .domain(d3.extent(paraData, d => +d[dim]))
+        .domain(d3.extent(histo, d => +d[dim]))
         .nice()
         .range([paraHeight, 0])
         })
@@ -298,13 +298,18 @@ function initChart()
     const barEls = g.append('g')
      .selectAll('path')
      .data(paraData)
-     .join('path')
-     .attr('d', path)
-     .attr('fill', 'none')
-     .attr('stroke', 'steelblue')
-     .attr('stroke-width', 1)
-     .attr('opacity', 0.25)
-     .attr('stroke', d => popularityColor(d))
+     .join(
+        enter => enter.append('path')
+         .attr('d', path)
+         .attr('fill', 'none')
+         .attr('stroke', popularityColor)
+         .attr('opacity', 0)
+         .transition().duration(400)
+         .attr('opacity', 0.3),
+        update => update.transition().duration(400).attr('d', path),
+        exit => exit.transition().duration(300).attr('opacity', 0).remove()
+     )
+
 
     
     const barAxis = g.selectAll('.axis')
@@ -328,11 +333,11 @@ function initChart()
      
     const barParaTitle = svg.append('text')
      .attr('x', size.width / 2)
-     .attr('y', margin.top / 2)
+     .attr('y', offsetY + margin.top / 2)
      .attr('text-anchor', 'middle')
      .style('font-size', '1rem')
      .style('font-weight', 'bold')
-     .text('Parallel Coordinates: Track/Artist Popularity Association with Followers & Duration ')
+     .text('Parallel Coordinates: Filtered Tracks) ')
    
     function popularityColor(d) 
     {
@@ -340,9 +345,9 @@ function initChart()
         if (d.track_popularity >= 40) return 'green'
         return 'steelblue'
      }
-    const legend = svg.append('g')
-     .attr('transform', `translate(${size.width - margin.right - 160}, ${margin.top})`)
-     
+    const legend = g.append('g')
+    .attr('transform', `translate(${paraWidth - 120}, 10)`)
+
     legend.append('line')
      .attr('x1', 0).attr('x2', 20)
      .attr('y1', 8).attr('y2', 8)
@@ -372,15 +377,6 @@ function initChart()
      .attr('x', 26).attr('y', 52)
      .style('font-size', '.8rem')
      .text('Low popularity')
-
-    
-    
-
-    
-
-    
-
-
 }
 
 

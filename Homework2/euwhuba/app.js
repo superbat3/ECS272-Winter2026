@@ -16,4 +16,3 @@ document.querySelector('#app').innerHTML = `
 `
 
 mountBarChart();
-mountCounter(document.querySelector('#counter-button'));
